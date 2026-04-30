@@ -2,8 +2,12 @@
   "name": "soundslop",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/main.cjs",
   "scripts": {
+    "predev": "node scripts/verify-workspace-root.cjs",
     "dev": "next dev",
+    "dev:desktop": "node scripts/dev-desktop.cjs",
+    "prebuild": "node scripts/verify-workspace-root.cjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -31,22 +35,27 @@
     "uuid": "^14.0.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^11.0.0",
+    "concurrently": "^9.2.1",
     "drizzle-kit": "^0.31.10",
+    "electron": "^41.3.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^9.0.5"
   },
   "ignoreScripts": [
     "sharp",
     "unrs-resolver"
   ],
   "trustedDependencies": [
+    "electron",
     "sharp",
     "unrs-resolver"
   ]

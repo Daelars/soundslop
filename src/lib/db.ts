@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 
 import Database from 'better-sqlite3';
@@ -5,9 +6,15 @@ import { and, asc, eq, isNull, like, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { v4 as uuid } from 'uuid';
 
+import {
+  ensureDesktopDatabaseInitialized,
+  getDatabasePath,
+} from '@/lib/database-path';
 import * as schema from '@/lib/schema';
 
-const databasePath = path.join(process.cwd(), 'soundslop.sqlite');
+const databasePath = getDatabasePath();
+ensureDesktopDatabaseInitialized(databasePath);
+fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 const sqlite = new Database(databasePath);
 
 sqlite.pragma('journal_mode = WAL');
