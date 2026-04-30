@@ -5,7 +5,7 @@ const waitOn = require("wait-on");
 require("./verify-workspace-root.cjs");
 
 const isWindows = process.platform === "win32";
-const env = { ...process.env, SOUNDSLOP_DESKTOP: "1" };
+const env = { ...process.env, FOLEYARD_DESKTOP: "1" };
 let nextProcess = null;
 let electronProcess = null;
 
@@ -48,7 +48,7 @@ async function stopStaleProcesses() {
     return;
   }
 
-  const script = `$currentPid = ${process.pid}; Get-CimInstance Win32_Process | Where-Object { (($_.Name -eq 'electron.exe') -or ($_.Name -eq 'node.exe')) -and ($_.ProcessId -ne $currentPid) -and ($_.CommandLine -like '*soundslop*') } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force } catch {} }`;
+  const script = `$currentPid = ${process.pid}; Get-CimInstance Win32_Process | Where-Object { (($_.Name -eq 'electron.exe') -or ($_.Name -eq 'node.exe')) -and ($_.ProcessId -ne $currentPid) -and (($_.CommandLine -like '*soundslop*') -or ($_.CommandLine -like '*foleyard*')) } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force } catch {} }`;
 
   await new Promise((resolve, reject) => {
     const child = spawn(

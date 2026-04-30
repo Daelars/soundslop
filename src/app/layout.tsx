@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SoundSlop",
+  title: "Foleyard",
   description: "Local audio library manager for sound effects and music.",
 };
 

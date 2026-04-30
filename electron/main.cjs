@@ -5,8 +5,10 @@ const path = require("path");
 
 const { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, shell } = require("electron");
 
-const APP_NAME = "SoundSlop";
-const DATABASE_FILENAME = "soundslop.sqlite";
+const APP_NAME = "Foleyard";
+const LEGACY_APP_NAMES = ["SoundSlop"];
+const DATABASE_FILENAME = "foleyard.sqlite";
+const LEGACY_DATABASE_FILENAMES = ["soundslop.sqlite"];
 const DEV_SERVER_URL = process.env.ELECTRON_START_URL ?? "http://localhost:3000";
 
 function reportMainProcessError(error) {
@@ -34,8 +36,17 @@ function getLegacyDatabasePath() {
   return path.join(process.cwd(), DATABASE_FILENAME);
 }
 
+function getLegacyProjectDatabasePaths() {
+  return LEGACY_DATABASE_FILENAMES.map((filename) => path.join(process.cwd(), filename));
+}
+
 function getDesktopUserDataDir() {
   return app.getPath("userData") || path.join(process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"), APP_NAME);
+}
+
+function getLegacyDesktopUserDataDirs() {
+  const baseDir = process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming");
+  return LEGACY_APP_NAMES.map((name) => path.join(baseDir, name));
 }
 
 function getDatabasePath() {
@@ -50,9 +61,20 @@ function ensureDesktopDatabaseInitialized() {
     return databasePath;
   }
 
-  const legacyDatabasePath = getLegacyDatabasePath();
-  if (legacyDatabasePath !== databasePath && fs.existsSync(legacyDatabasePath)) {
-    fs.copyFileSync(legacyDatabasePath, databasePath);
+  const candidatePaths = [
+    getLegacyDatabasePath(),
+    ...getLegacyProjectDatabasePaths(),
+    ...getLegacyDesktopUserDataDirs().flatMap((dir) => [
+      path.join(dir, DATABASE_FILENAME),
+      ...LEGACY_DATABASE_FILENAMES.map((filename) => path.join(dir, filename)),
+    ]),
+  ];
+
+  for (const candidatePath of candidatePaths) {
+    if (candidatePath !== databasePath && fs.existsSync(candidatePath)) {
+      fs.copyFileSync(candidatePath, databasePath);
+      return databasePath;
+    }
   }
 
   return databasePath;

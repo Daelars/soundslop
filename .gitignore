@@ -14,9 +14,9 @@
 /coverage
 
 # local app data
-/soundslop.sqlite
-/soundslop.sqlite-*
-/soundslop.db
+/foleyard.sqlite
+/foleyard.sqlite-*
+/foleyard.db
 /*.sqlite
 /*.sqlite-*
 /*.db

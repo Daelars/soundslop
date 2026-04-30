@@ -73,7 +73,7 @@ export function Sidebar({
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,color-mix(in_oklab,var(--primary)_12%,transparent),transparent_36%)]" />
       <div className="relative flex flex-col gap-4 p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold tracking-tight px-2">SoundSlop</h2>
+          <h2 className="text-lg font-bold tracking-tight px-2">Foleyard</h2>
           {scanStatus.running && (
              <Activity className="size-4 text-primary animate-pulse" />
           )}

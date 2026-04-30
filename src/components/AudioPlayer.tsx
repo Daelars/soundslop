@@ -44,7 +44,8 @@ interface AudioPlayerProps {
   onAddToCollection: (collectionId: string) => Promise<void>;
 }
 
-const VOLUME_STORAGE_KEY = "soundslop-volume";
+const VOLUME_STORAGE_KEY = "foleyard-volume";
+const LEGACY_VOLUME_STORAGE_KEYS = ["soundslop-volume"];
 
 export function AudioPlayer({
   selectedFile,
@@ -98,7 +99,11 @@ function AudioPlayerContent({
       return 0.72;
     }
 
-    const savedVolume = window.localStorage.getItem(VOLUME_STORAGE_KEY);
+    const savedVolume =
+      window.localStorage.getItem(VOLUME_STORAGE_KEY) ??
+      LEGACY_VOLUME_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find(
+        (value) => value !== null,
+      );
     const parsedVolume = savedVolume ? Number(savedVolume) : 0.72;
     return Number.isFinite(parsedVolume) ? parsedVolume : 0.72;
   });
