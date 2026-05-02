@@ -609,7 +609,7 @@ export function DotMatrixBase({
           transformOrigin: "center center" as const
         }
       : { minWidth: minSize, minHeight: minSize })
-  } as unknown as CSSProperties;
+  };
 
   const dots = Array.from({ length: MATRIX_SIZE * MATRIX_SIZE }).map((_, index) => {
     const { row, col } = indexToCoord(index);

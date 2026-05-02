@@ -1,4 +1,3 @@
-import fs from 'fs';
 import path from 'path';
 
 import Database from 'better-sqlite3';
@@ -14,7 +13,6 @@ import * as schema from '@/lib/schema';
 
 const databasePath = getDatabasePath();
 ensureDesktopDatabaseInitialized(databasePath);
-fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 const sqlite = new Database(databasePath);
 
 sqlite.pragma('journal_mode = WAL');
@@ -377,11 +375,73 @@ export function touchFileAsSeen(pathValue: string, lastScannedAt: string) {
     .run();
 }
 
+export function batchTouchFiles(entries: { path: string; lastScannedAt: string }[], now: string) {
+  if (entries.length === 0) return;
+  const stmt = sqlite.prepare(
+    "UPDATE files SET removed_at = NULL, last_scanned_at = ?, updated_at = ? WHERE path = ?",
+  );
+  const txn = sqlite.transaction((entries) => {
+    for (const e of entries) {
+      stmt.run(now, now, e.path);
+    }
+  });
+  txn(entries);
+}
+
+export function batchUpsertFiles(records: Array<{
+  path: string;
+  filename: string;
+  directory: string | null;
+  format: string | null;
+  duration: number | null;
+  sampleRate: number | null;
+  bitDepth: number | null;
+  channels: number | null;
+  fileSize: number | null;
+  mtimeMs: number;
+  removedAt: string | null;
+  lastScannedAt: string;
+}>, now: string) {
+  if (records.length === 0) return;
+  const stmt = sqlite.prepare(
+    `INSERT INTO files (id, path, filename, directory, format, duration, sample_rate, bit_depth, channels, file_size, mtime_ms, removed_at, last_scanned_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(path) DO UPDATE SET
+       filename=excluded.filename, directory=excluded.directory, format=excluded.format,
+       duration=excluded.duration, sample_rate=excluded.sample_rate, bit_depth=excluded.bit_depth,
+       channels=excluded.channels, file_size=excluded.file_size, mtime_ms=excluded.mtime_ms,
+       removed_at=excluded.removed_at, last_scanned_at=excluded.last_scanned_at, updated_at=excluded.updated_at`,
+  );
+  const txn = sqlite.transaction((records) => {
+    for (const r of records) {
+      stmt.run(
+        uuid(), r.path, r.filename, r.directory, r.format, r.duration,
+        r.sampleRate, r.bitDepth, r.channels, r.fileSize, r.mtimeMs,
+        r.removedAt, r.lastScannedAt, now,
+      );
+    }
+  });
+  txn(records);
+}
+
 export function markFileRemoved(pathValue: string, removedAt: string) {
   db.update(schema.files)
     .set({ removedAt, updatedAt: new Date().toISOString() })
     .where(and(eq(schema.files.path, pathValue), isNull(schema.files.removedAt)))
     .run();
+}
+
+export function batchMarkRemoved(paths: string[], removedAt: string, now: string) {
+  if (paths.length === 0) return;
+  const stmt = sqlite.prepare(
+    "UPDATE files SET removed_at = ?, updated_at = ? WHERE path = ? AND removed_at IS NULL",
+  );
+  const txn = sqlite.transaction((paths) => {
+    for (const p of paths) {
+      stmt.run(removedAt, now, p);
+    }
+  });
+  txn(paths);
 }
 
 export function reconcileMovedFiles() {

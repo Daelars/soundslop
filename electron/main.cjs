@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -152,23 +151,6 @@ ipcMain.on("desktop:start-drag-file", (event, payload) => {
   try {
     event.sender.startDrag({
       files: [filePath],
-      icon: createDragIcon(),
-    });
-  } catch (error) {
-    reportMainProcessError(error);
-  }
-});
-
-ipcMain.on("desktop:start-test-drag-file", async (event) => {
-  const resolved = await resolveFirstIndexedFile();
-  if (!resolved.ok) {
-    event.sender.send("desktop:action-error", resolved.error);
-    return;
-  }
-
-  try {
-    event.sender.startDrag({
-      files: [resolved.file.path],
       icon: createDragIcon(),
     });
   } catch (error) {

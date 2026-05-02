@@ -6,11 +6,11 @@ import {
   getLibraryRoot,
   getLibraryStats,
   getFileByPath,
-  markFileRemoved,
+  batchMarkRemoved,
+  batchTouchFiles,
+  batchUpsertFiles,
   reconcileMovedFiles,
   setLibraryRoot,
-  touchFileAsSeen,
-  upsertFile,
 } from '@/lib/db';
 import { extractMetadata } from '@/lib/metadata';
 
@@ -209,6 +209,22 @@ async function runScan(libraryRoot: string) {
     }
 
     for (const chunk of chunks) {
+      const touchEntries: { path: string; lastScannedAt: string }[] = [];
+      const upsertRecords: Array<{
+        path: string;
+        filename: string;
+        directory: string | null;
+        format: string | null;
+        duration: number | null;
+        sampleRate: number | null;
+        bitDepth: number | null;
+        channels: number | null;
+        fileSize: number | null;
+        mtimeMs: number;
+        removedAt: string | null;
+        lastScannedAt: string;
+      }> = [];
+
       await Promise.all(chunk.map(async (filePath) => {
         seenPaths.add(filePath);
 
@@ -224,14 +240,15 @@ async function runScan(libraryRoot: string) {
             existing.directory === undefined;
 
           if (!changed && existing) {
-            touchFileAsSeen(filePath, now);
+            touchEntries.push({ path: filePath, lastScannedAt: now });
             return;
           }
 
           const metadata = await extractMetadata(filePath);
+
           const directory = path.relative(normalizedRoot, path.dirname(filePath));
           const dir = directory === '.' ? '' : directory;
-          upsertFile({
+          upsertRecords.push({
             path: filePath,
             filename: metadata.filename,
             directory: dir || null,
@@ -255,19 +272,25 @@ async function runScan(libraryRoot: string) {
           scanStatus.failed += 1;
         }
       }));
+
+      batchTouchFiles(touchEntries, now);
+      batchUpsertFiles(upsertRecords, now);
     }
 
     scanStatus.phase = 'cleaning';
     const removedAt = new Date().toISOString();
+    const removedPaths: string[] = [];
 
     for (const file of allExistingFiles) {
       if (seenPaths.has(file.path) || file.removedAt !== null) {
         continue;
       }
 
-      markFileRemoved(file.path, removedAt);
+      removedPaths.push(file.path);
       scanStatus.removed += 1;
     }
+
+    batchMarkRemoved(removedPaths, removedAt, now);
 
     const relinkedFiles = reconcileMovedFiles();
     scanStatus.removed = Math.max(0, scanStatus.removed - relinkedFiles);
