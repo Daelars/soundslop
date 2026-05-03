@@ -149,17 +149,6 @@ function SettingsDialogBody({
 
   const validatePath = async () => {
     const path = rootDraft.trim();
-    if (!path) {
-      setValidationResult({
-        valid: false,
-        normalizedPath: null,
-        readable: false,
-        audioFileCount: 0,
-        samples: [],
-        error: "Enter a folder path first.",
-      });
-      return null;
-    }
 
     setIsValidating(true);
 
@@ -199,8 +188,8 @@ function SettingsDialogBody({
 
     try {
       const validation = await validatePath();
-      if (!validation?.valid || !validation.normalizedPath) {
-        toast.error(validation?.error ?? "Choose a valid library folder");
+      if (!validation?.valid || validation.normalizedPath === null) {
+        toast.error(validation?.error ?? "Choose a valid library prefix");
         return;
       }
 
@@ -262,16 +251,16 @@ function SettingsDialogBody({
                   <div>
                     <h3 className="flex items-center gap-2 text-sm font-semibold">
                       <FolderOpen className="size-4 text-primary" />
-                      Library Folder
+                      R2 Prefix
                     </h3>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Enter the folder that contains your local sound library.
+                      Leave blank to scan the whole R2 bucket, or enter a bucket prefix.
                     </p>
                   </div>
                   {settings.libraryRoot ? (
                     <Badge variant="secondary">Configured</Badge>
                   ) : (
-                    <Badge variant="outline">Required</Badge>
+                    <Badge variant="outline">Bucket root</Badge>
                   )}
                 </div>
 
@@ -283,13 +272,13 @@ function SettingsDialogBody({
                         setRootDraft(event.target.value);
                         setValidationResult(null);
                       }}
-                      placeholder="C:\\Samples or /Volumes/Audio"
+                      placeholder="audio/ or leave blank"
                       className="h-10 flex-1 font-mono text-sm"
                     />
                     <Button
                       variant="outline"
                       onClick={validatePath}
-                      disabled={isValidating || !rootDraft.trim()}
+                      disabled={isValidating}
                     >
                       {isValidating ? (
                         <Loader2 className="mr-2 size-4 animate-spin" />
@@ -310,11 +299,11 @@ function SettingsDialogBody({
 
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs text-muted-foreground">
-                      Saving a new folder resets the indexed library and requires a scan.
+                      Saving a new prefix resets the indexed library and requires a scan.
                     </p>
                     <Button
                       onClick={handleSave}
-                      disabled={isSaving || isValidating || !rootDraft.trim() || !hasPathChanged}
+                      disabled={isSaving || isValidating || !hasPathChanged}
                       className="gap-2"
                     >
                       {isSaving ? (
@@ -322,7 +311,7 @@ function SettingsDialogBody({
                       ) : (
                         <Save className="size-4" />
                       )}
-                      Save Library Path
+                      Save R2 Prefix
                     </Button>
                   </div>
                 </div>
@@ -340,7 +329,7 @@ function SettingsDialogBody({
                   </div>
                   <Button
                     onClick={handleStartScan}
-                    disabled={scanStatus.running || isStartingScan || !settings.libraryRoot}
+                    disabled={scanStatus.running || isStartingScan}
                     variant={scanStatus.running ? "outline" : "default"}
                     className="gap-2"
                   >

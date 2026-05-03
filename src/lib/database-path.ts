@@ -2,8 +2,8 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-const DATABASE_FILENAME = "foleyard.sqlite";
-const LEGACY_DATABASE_FILENAMES = ["soundslop.sqlite"];
+const DATABASE_FILENAME = "foleyard-cloud-v1.sqlite";
+const LEGACY_DATABASE_FILENAMES: string[] = [];
 const DESKTOP_APP_NAME = "Foleyard";
 const LEGACY_DESKTOP_APP_NAMES = ["SoundSlop"];
 const DESKTOP_ENV_KEYS = ["FOLEYARD_DESKTOP", "SOUNDSLOP_DESKTOP"];

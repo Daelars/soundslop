@@ -1,4 +1,3 @@
-import fs from 'fs/promises';
 import path from 'path';
 
 import {
@@ -12,7 +11,8 @@ import {
   touchFileAsSeen,
   upsertFile,
 } from '@/lib/db';
-import { extractMetadata } from '@/lib/metadata';
+import { extractR2Metadata } from '@/lib/metadata';
+import { getDefaultR2LibraryRoot, getR2Config, listR2AudioObjects, normalizeR2Prefix } from '@/lib/r2';
 
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.flac', '.aiff', '.m4a', '.aac']);
 
@@ -68,69 +68,27 @@ const scanStatus: ScanStatus = {
 
 let activeScan: Promise<void> | null = null;
 
-async function existsReadableDirectory(dirPath: string) {
-  const stat = await fs.stat(dirPath);
-  if (!stat.isDirectory()) {
-    throw new Error('Path is not a directory');
-  }
-
-  await fs.access(dirPath);
-}
-
-async function collectAudioFiles(rootPath: string, onDiscover?: (filePath: string) => void) {
-  const found: string[] = [];
-  const dirsToProcess: string[] = [rootPath];
-
-  while (dirsToProcess.length > 0) {
-    const currentPath = dirsToProcess.pop()!;
-    const entries = await fs.readdir(currentPath, { withFileTypes: true });
-
-    const subdirs: string[] = [];
-    const files: string[] = [];
-
-    for (const entry of entries) {
-      const fullPath = path.join(currentPath, entry.name);
-
-      if (entry.isDirectory()) {
-        subdirs.push(fullPath);
-      } else if (entry.isFile()) {
-        const extension = path.extname(entry.name).toLowerCase();
-        if (AUDIO_EXTENSIONS.has(extension)) {
-          files.push(fullPath);
-        }
-      }
-    }
-
-    for (const filePath of files) {
-      found.push(filePath);
-      onDiscover?.(filePath);
-    }
-
-    dirsToProcess.push(...subdirs);
-  }
-
-  return found;
+function isAudioKey(key: string) {
+  return AUDIO_EXTENSIONS.has(path.posix.extname(key).toLowerCase());
 }
 
 export async function validateLibraryRoot(inputPath: string): Promise<PathValidation> {
-  const normalizedPath = path.resolve(inputPath.trim());
-
   try {
-    await existsReadableDirectory(normalizedPath);
-    const files = await collectAudioFiles(normalizedPath);
+    const normalizedPath = normalizeR2Prefix(inputPath.trim() || getR2Config().prefix);
+    const files = await listR2AudioObjects(normalizedPath, isAudioKey);
 
     return {
       valid: true,
       normalizedPath,
       readable: true,
       audioFileCount: files.length,
-      samples: files.slice(0, 5).map((filePath) => path.relative(normalizedPath, filePath)),
+      samples: files.slice(0, 5).map((file) => file.key),
       error: null,
     };
   } catch (error) {
     return {
       valid: false,
-      normalizedPath,
+      normalizedPath: null,
       readable: false,
       audioFileCount: 0,
       samples: [],
@@ -142,7 +100,7 @@ export async function validateLibraryRoot(inputPath: string): Promise<PathValida
 export function getScanStatus() {
   return {
     ...scanStatus,
-    libraryRoot: scanStatus.libraryRoot ?? getLibraryRoot(),
+    libraryRoot: scanStatus.libraryRoot ?? getLibraryRoot() ?? getDefaultR2LibraryRoot(),
     stats: getLibraryStats(),
   };
 }
@@ -156,10 +114,7 @@ export function startScan() {
     return { started: false, reason: 'already-running', status: getScanStatus() };
   }
 
-  const libraryRoot = getLibraryRoot();
-  if (!libraryRoot) {
-    return { started: false, reason: 'missing-root', status: getScanStatus() };
-  }
+  const libraryRoot = getLibraryRoot() ?? '';
 
   activeScan = runScan(libraryRoot);
   void activeScan.finally(() => {
@@ -185,17 +140,16 @@ async function runScan(libraryRoot: string) {
 
   try {
     const validation = await validateLibraryRoot(libraryRoot);
-    if (!validation.valid || !validation.normalizedPath) {
+    if (!validation.valid || validation.normalizedPath === null) {
       throw new Error(validation.error ?? 'Invalid library root');
     }
 
-    const normalizedRoot = validation.normalizedPath;
+    const normalizedRoot = validation.normalizedPath ?? '';
     scanStatus.phase = 'discovering';
 
-    const discoveredFiles = await collectAudioFiles(normalizedRoot, () => {
-      scanStatus.discovered += 1;
-      scanStatus.total = scanStatus.discovered;
-    });
+    const discoveredFiles = await listR2AudioObjects(normalizedRoot, isAudioKey);
+    scanStatus.discovered = discoveredFiles.length;
+    scanStatus.total = discoveredFiles.length;
 
     scanStatus.phase = 'indexing';
     const seenPaths = new Set<string>();
@@ -209,30 +163,33 @@ async function runScan(libraryRoot: string) {
     }
 
     for (const chunk of chunks) {
-      await Promise.all(chunk.map(async (filePath) => {
-        seenPaths.add(filePath);
+      await Promise.all(chunk.map(async (file) => {
+        seenPaths.add(file.key);
 
         try {
-          const stats = await fs.stat(filePath);
-          const existing = getFileByPath(filePath);
+          const existing = getFileByPath(file.key);
+          const mtimeMs = file.lastModified?.getTime() ?? 0;
           const changed =
             !existing ||
-            existing.fileSize !== stats.size ||
-            existing.mtimeMs !== Math.trunc(stats.mtimeMs) ||
+            existing.fileSize !== file.size ||
+            existing.mtimeMs !== mtimeMs ||
             existing.removedAt !== null ||
             existing.directory === null ||
             existing.directory === undefined;
 
           if (!changed && existing) {
-            touchFileAsSeen(filePath, now);
+            touchFileAsSeen(file.key, now);
             return;
           }
 
-          const metadata = await extractMetadata(filePath);
-          const directory = path.relative(normalizedRoot, path.dirname(filePath));
+          const metadata = await extractR2Metadata(file.key, file.size);
+          const relativeKey = normalizedRoot && file.key.startsWith(normalizedRoot)
+            ? file.key.slice(normalizedRoot.length)
+            : file.key;
+          const directory = path.posix.dirname(relativeKey);
           const dir = directory === '.' ? '' : directory;
           upsertFile({
-            path: filePath,
+            path: file.key,
             filename: metadata.filename,
             directory: dir || null,
             format: metadata.format,
@@ -241,7 +198,7 @@ async function runScan(libraryRoot: string) {
             bitDepth: metadata.bitDepth,
             channels: metadata.channels,
             fileSize: metadata.fileSize,
-            mtimeMs: Math.trunc(stats.mtimeMs),
+            mtimeMs,
             removedAt: null,
             lastScannedAt: now,
           });

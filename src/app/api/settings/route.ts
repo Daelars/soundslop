@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       const pathValue = String(body?.path ?? '');
       const validation = await validateLibraryRoot(pathValue);
 
-      if (!validation.valid || !validation.normalizedPath) {
+      if (!validation.valid || validation.normalizedPath === null) {
         return NextResponse.json(validation, { status: 400 });
       }
 
