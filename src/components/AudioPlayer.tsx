@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   FolderPlus,
   Heart,
@@ -44,50 +44,68 @@ interface AudioPlayerProps {
   onAddToCollection: (collectionId: string) => Promise<void>;
 }
 
+export interface AudioPlayerRef {
+  togglePlayback: () => void;
+}
+
 const VOLUME_STORAGE_KEY = "foleyard-volume";
 const LEGACY_VOLUME_STORAGE_KEYS = ["soundslop-volume"];
 
-export function AudioPlayer({
-  selectedFile,
-  onClose,
-  onPlaybackChange,
-  onToggleFavorite,
-  collections,
-  onAddToCollection,
-}: AudioPlayerProps) {
-  if (!selectedFile) {
-    return null;
-  }
+export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
+  function AudioPlayer(
+    {
+      selectedFile,
+      onClose,
+      onPlaybackChange,
+      onToggleFavorite,
+      collections,
+      onAddToCollection,
+    },
+    ref,
+  ) {
+    if (!selectedFile) {
+      return null;
+    }
 
-  return (
-    <AudioPlayerContent
-      key={selectedFile.id}
-      selectedFile={selectedFile}
-      onClose={onClose}
-      onPlaybackChange={onPlaybackChange}
-      onToggleFavorite={onToggleFavorite}
-      collections={collections}
-      onAddToCollection={onAddToCollection}
-    />
-  );
-}
+    return (
+      <AudioPlayerContent
+        ref={ref}
+        key={selectedFile.id}
+        selectedFile={selectedFile}
+        onClose={onClose}
+        onPlaybackChange={onPlaybackChange}
+        onToggleFavorite={onToggleFavorite}
+        collections={collections}
+        onAddToCollection={onAddToCollection}
+      />
+    );
+  },
+);
 
-function AudioPlayerContent({
-  selectedFile,
-  onClose,
-  onPlaybackChange,
-  onToggleFavorite,
-  collections,
-  onAddToCollection,
-}: {
+const AudioPlayerContent = forwardRef<AudioPlayerRef, {
   selectedFile: FileRecord;
   onClose: () => void;
   onPlaybackChange?: (isPlaying: boolean) => void;
   onToggleFavorite: (id: string) => Promise<void>;
   collections: { id: string; name: string; fileCount?: number }[];
   onAddToCollection: (collectionId: string) => Promise<void>;
-}) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+}>(
+  function AudioPlayerContent(
+    {
+      selectedFile,
+      onClose,
+      onPlaybackChange,
+      onToggleFavorite,
+      collections,
+      onAddToCollection,
+    },
+    ref,
+  ) {
+    useImperativeHandle(ref, () => ({
+      togglePlayback,
+    }));
+
+    const audioRef = useRef<HTMLAudioElement | null>(null);
   const volumeRef = useRef(0.72);
   const isMutedRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -396,7 +414,7 @@ function AudioPlayerContent({
       </div>
     </div>
   );
-}
+});
 
 function formatTime(seconds: number) {
   if (!seconds || Number.isNaN(seconds)) {

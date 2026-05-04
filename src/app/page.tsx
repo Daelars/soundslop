@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import { Search, Loader2, PanelLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Sidebar } from "@/components/Sidebar";
 import { FileTable } from "@/components/FileTable";
-import { AudioPlayer } from "@/components/AudioPlayer";
+import { AudioPlayer, AudioPlayerRef } from "@/components/AudioPlayer";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -93,6 +93,8 @@ function HomeContent() {
     stats: { activeFiles: 0, removedFiles: 0 },
   });
   const [scanStatus, setScanStatus] = useState<ScanStatus>(emptyScanStatus);
+
+  const audioPlayerRef = useRef<AudioPlayerRef>(null);
 
   const showLibrary = useCallback(() => {
     setCurrentView("all");
@@ -470,9 +472,12 @@ function HomeContent() {
           selectedFileId={selectedFile?.id ?? null}
           isSelectedFilePlaying={isPlayerPlaying}
           onSelect={(file) => {
-            setSelectedFile(file);
-            setIsPlayerPlaying(false);
-          }}
+             if (selectedFile?.id === file.id) {
+               audioPlayerRef.current?.togglePlayback();
+             } else {
+               setSelectedFile(file);
+             }
+           }}
           onToggleFavorite={handleToggleFavorite}
           searchQuery={deferredSearchQuery}
           isLoading={isLoadingFiles}
@@ -486,6 +491,7 @@ function HomeContent() {
       </main>
 
       <AudioPlayer
+        ref={audioPlayerRef}
         selectedFile={selectedFile}
         onClose={() => {
           setSelectedFile(null);
